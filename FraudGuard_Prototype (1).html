@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FraudGuard — Real-Time Fraud Prevention Prototype</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #07090f;
+      --bg2: #0d1117;
+      --bg3: #131820;
+      --border: rgba(255,255,255,0.07);
+      --border2: rgba(255,255,255,0.13);
+      --text: #e8ecf1;
+      --text2: #8a96a8;
+      --text3: #4e5a6b;
+      --cyan: #00c8d4;
+      --cyan-dim: rgba(0,200,212,0.12);
+      --green: #22c55e;
+      --green-dim: rgba(34,197,94,0.12);
+      --amber: #f59e0b;
+      --amber-dim: rgba(245,158,11,0.12);
+      --red: #ef4444;
+      --red-dim: rgba(239,68,68,0.12);
+      --mono: 'IBM Plex Mono', monospace;
+      --sans: 'Syne', sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      padding: 0;
+    }
+
+    /* TOP BAR */
+    .topbar {
+      background: var(--bg2);
+      border-bottom: 0.5px solid var(--border2);
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .topbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .topbar-logo {
+      width: 34px; height: 34px;
+      background: var(--cyan-dim);
+      border: 0.5px solid var(--cyan);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .topbar-logo svg { width: 18px; height: 18px; }
+    .topbar-title { font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: -.01em; }
+    .topbar-sub { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+    .topbar-status {
+      display: flex; align-items: center; gap: 20px;
+    }
+    .status-pill {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--green-dim);
+      border: 0.5px solid rgba(34,197,94,0.3);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 11px; font-weight: 500; color: var(--green);
+      font-family: var(--mono);
+    }
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green);
+      animation: blink 2s infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .topbar-metric { text-align: right; }
+    .topbar-metric-label { font-size: 10px; color: var(--text3); font-family: var(--mono); }
+    .topbar-metric-val { font-size: 15px; font-weight: 600; font-family: var(--mono); color: var(--text); }
+
+    /* MAIN LAYOUT */
+    .main { max-width: 1100px; margin: 0 auto; padding: 28px 24px 60px; }
+
+    .page-intro { margin-bottom: 24px; }
+    .page-intro h1 { font-size: 22px; font-weight: 700; color: var(--text); letter-spacing: -.02em; margin-bottom: 6px; }
+    .page-intro p { font-size: 13px; color: var(--text2); line-height: 1.6; max-width: 560px; }
+
+    /* STAT ROW */
+    .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+    .stat-card {
+      background: var(--bg2); border: 0.5px solid var(--border);
+      border-radius: 10px; padding: 14px 16px;
+    }
+    .stat-label { font-size: 10px; color: var(--text3); font-family: var(--mono); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 4px; }
+    .stat-val { font-size: 22px; font-weight: 700; font-family: var(--mono); color: var(--text); }
+    .stat-val.green { color: var(--green); }
+    .stat-val.red { color: var(--red); }
+    .stat-val.amber { color: var(--amber); }
+    .stat-val.cyan { color: var(--cyan); }
+
+    /* GRID */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    /* PANEL */
+    .panel {
+      background: var(--bg2); border: 0.5px solid var(--border);
+      border-radius: 12px; padding: 18px;
+    }
+    .panel-title {
+      font-size: 10px; font-weight: 600; color: var(--text3);
+      letter-spacing: .1em; text-transform: uppercase;
+      font-family: var(--mono);
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 0.5px solid var(--border);
+    }
+
+    /* TX LIST */
+    .tx-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; margin-bottom: 14px; }
+    .tx-list::-webkit-scrollbar { width: 3px; }
+    .tx-list::-webkit-scrollbar-track { background: transparent; }
+    .tx-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    .tx-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 0.5px solid var(--border);
+      cursor: pointer;
+      transition: background .12s, border-color .12s;
+    }
+    .tx-item:hover { background: var(--bg3); border-color: var(--border2); }
+    .tx-item.active { border-color: var(--cyan); background: var(--cyan-dim); }
+
+    .tx-avatar {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: rgba(0,200,212,0.15);
+      border: 0.5px solid rgba(0,200,212,0.25);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: var(--cyan);
+      flex-shrink: 0; font-family: var(--mono);
+    }
+    .tx-info { flex: 1; min-width: 0; }
+    .tx-name { font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tx-meta { font-size: 11px; color: var(--text3); font-family: var(--mono); }
+    .tx-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+    .tx-amt { font-size: 13px; font-weight: 600; font-family: var(--mono); color: var(--text); }
+    .badge {
+      font-size: 9px; font-weight: 600; padding: 2px 7px;
+      border-radius: 20px; font-family: var(--mono);
+      letter-spacing: .04em;
+    }
+    .badge-live { background: rgba(0,200,212,0.15); color: var(--cyan); animation: blink 1.2s infinite; }
+    .badge-done { background: var(--bg3); color: var(--text3); }
+
+    /* INJECT BUTTON */
+    .inject-btn {
+      width: 100%; padding: 10px;
+      background: rgba(0,200,212,0.08);
+      border: 0.5px solid rgba(0,200,212,0.35);
+      border-radius: 8px;
+      color: var(--cyan);
+      font-size: 13px; font-weight: 600;
+      font-family: var(--sans);
+      cursor: pointer;
+      transition: background .15s, border-color .15s;
+    }
+    .inject-btn:hover { background: rgba(0,200,212,0.15); border-color: var(--cyan); }
+    .inject-btn:active { transform: scale(0.98); }
+
+    /* ENGINE PANEL */
+    .engine { display: flex; flex-direction: column; gap: 12px; }
+
+    .score-area { display: flex; align-items: center; gap: 16px; }
+    .score-ring { width: 80px; height: 80px; flex-shrink: 0; position: relative; }
+    .score-ring svg { width: 80px; height: 80px; }
+    .score-val {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 20px; font-weight: 700;
+      font-family: var(--mono);
+      color: var(--text2);
+    }
+    .score-meta { flex: 1; }
+    .score-meta-label { font-size: 11px; color: var(--text3); font-family: var(--mono); margin-bottom: 3px; }
+
+    .decision-bar {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 10px 14px; border-radius: 8px;
+      font-size: 14px; font-weight: 700;
+      border: 0.5px solid var(--border);
+      color: var(--text2);
+      background: var(--bg3);
+      letter-spacing: -.01em;
+      transition: background .3s, color .3s, border-color .3s;
+    }
+    .decision-bar.approve { background: var(--green-dim); color: var(--green); border-color: rgba(34,197,94,0.25); }
+    .decision-bar.decline { background: var(--red-dim); color: var(--red); border-color: rgba(239,68,68,0.25); }
+    .decision-bar.review { background: var(--amber-dim); color: var(--amber); border-color: rgba(245,158,11,0.25); }
+
+    /* TIMER */
+    .timer-row { display: flex; align-items: center; gap: 10px; }
+    .timer-label { font-size: 11px; color: var(--text3); font-family: var(--mono); flex-shrink: 0; }
+    .timer-bar-wrap { flex: 1; height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .timer-bar { height: 3px; border-radius: 2px; background: var(--cyan); width: 0%; transition: width .05s linear; }
+    .timer-val { font-size: 11px; font-family: var(--mono); color: var(--text2); min-width: 40px; text-align: right; }
+
+    /* SIGNALS */
+    .signals { display: flex; flex-direction: column; gap: 7px; }
+    .signal-row { display: flex; align-items: center; gap: 8px; }
+    .signal-label { font-size: 11px; color: var(--text2); flex: 1; font-family: var(--mono); }
+    .signal-bar-wrap { width: 90px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+    .signal-bar { height: 4px; border-radius: 2px; transition: width .4s ease; }
+    .signal-pct { font-size: 11px; font-family: var(--mono); color: var(--text3); width: 28px; text-align: right; }
+
+    /* EXPLAIN */
+    .explain-box {
+      font-size: 12px; color: var(--text2);
+      line-height: 1.7;
+      padding: 10px 12px;
+      background: var(--bg3);
+      border-radius: 8px;
+      border-left: 2px solid var(--border2);
+      font-family: var(--mono);
+    }
+
+    /* AUDIT */
+    .audit-panel { margin-top: 14px; }
+    .audit-list { display: flex; flex-direction: column; gap: 3px; max-height: 130px; overflow-y: auto; }
+    .audit-list::-webkit-scrollbar { width: 3px; }
+    .audit-list::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+    .audit-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 6px 10px; border-radius: 6px;
+      font-size: 11px; font-family: var(--mono);
+    }
+    .audit-row:hover { background: var(--bg3); }
+    .audit-time { color: var(--text3); flex-shrink: 0; }
+    .audit-msg { color: var(--text2); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .audit-badge {
+      font-size: 9px; font-weight: 700; padding: 2px 8px;
+      border-radius: 20px; flex-shrink: 0; letter-spacing: .06em;
+    }
+    .ab-approve { background: var(--green-dim); color: var(--green); }
+    .ab-decline { background: var(--red-dim); color: var(--red); }
+    .ab-review { background: var(--amber-dim); color: var(--amber); }
+
+    .idle-hint { text-align: center; font-size: 12px; color: var(--text3); padding: 24px 0; font-family: var(--mono); }
+
+    /* FOOTER */
+    .footer {
+      border-top: 0.5px solid var(--border);
+      padding: 18px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 11px; color: var(--text3); font-family: var(--mono);
+    }
+    .footer-confidential {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 20px;
+      border: 0.5px solid var(--border2);
+      font-size: 10px; letter-spacing: .06em;
+    }
+
+    @media (max-width: 700px) {
+      .grid { grid-template-columns: 1fr; }
+      .stat-row { grid-template-columns: 1fr 1fr; }
+      .topbar-status { gap: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="topbar-logo">
+      <svg viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 1L2 4.5V9.5C2 13.1 5.1 16.4 9 17C12.9 16.4 16 13.1 16 9.5V4.5L9 1Z" stroke="#00c8d4" stroke-width="1.2" fill="none"/>
+        <path d="M6 9L8 11L12 7" stroke="#00c8d4" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <div>
+      <div class="topbar-title">FraudGuard</div>
+      <div class="topbar-sub">Black Box Engine v2.4 — Prototype</div>
+    </div>
+  </div>
+  <div class="topbar-status">
+    <div class="status-pill">
+      <div class="status-dot"></div>
+      ENGINE ACTIVE
+    </div>
+    <div class="topbar-metric">
+      <div class="topbar-metric-label">TRANSACTIONS</div>
+      <div class="topbar-metric-val" id="txCountTop">0</div>
+    </div>
+    <div class="topbar-metric">
+      <div class="topbar-metric-label">BLOCKED</div>
+      <div class="topbar-metric-val" style="color:var(--red);" id="fraudCountTop">0</div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <div class="page-intro">
+    <h1>Real-Time Payment Fraud Prevention</h1>
+    <p>Every payment is intercepted, evaluated against 14 risk signals in under 50ms, and routed with a compliance-ready explanation — without exposing the proprietary detection model.</p>
+  </div>
+
+  <!-- STAT ROW -->
+  <div class="stat-row">
+    <div class="stat-card">
+      <div class="stat-label">Transactions evaluated</div>
+      <div class="stat-val cyan" id="statTotal">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Approved</div>
+      <div class="stat-val green" id="statApprove">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Declined (fraud)</div>
+      <div class="stat-val red" id="statDecline">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Under review</div>
+      <div class="stat-val amber" id="statReview">0</div>
+    </div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="grid">
+
+    <!-- LEFT: TRANSACTION FEED -->
+    <div class="panel">
+      <div class="panel-title">Intercepted payments</div>
+      <div class="tx-list" id="txList">
+        <div class="idle-hint">Click "Inject payment" to simulate a transaction</div>
+      </div>
+      <button class="inject-btn" onclick="injectTx()">⊕ Inject payment</button>
+    </div>
+
+    <!-- RIGHT: ENGINE OUTPUT -->
+    <div class="panel">
+      <div class="panel-title">Risk engine output</div>
+      <div class="engine">
+
+        <div class="score-area">
+          <div class="score-ring">
+            <svg viewBox="0 0 80 80" fill="none">
+              <circle cx="40" cy="40" r="32" stroke="rgba(255,255,255,0.06)" stroke-width="7"/>
+              <circle cx="40" cy="40" r="32" id="scoreArc"
+                stroke="#4e5a6b" stroke-width="7"
+                stroke-dasharray="201" stroke-dashoffset="201"
+                stroke-linecap="round"
+                transform="rotate(-90 40 40)"
+                style="transition: stroke-dashoffset .5s ease, stroke .4s;"/>
+            </svg>
+            <div class="score-val" id="scoreVal">—</div>
+          </div>
+          <div class="score-meta">
+            <div class="score-meta-label">Risk score / 100</div>
+            <div style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:2px;">14 signal composite</div>
+            <div style="font-size:11px;color:var(--text3);font-family:var(--mono);">Proprietary weighting</div>
+          </div>
+        </div>
+
+        <div class="decision-bar" id="decisionBar">
+          Awaiting transaction
+        </div>
+
+        <div class="timer-row">
+          <span class="timer-label">Eval time</span>
+          <div class="timer-bar-wrap"><div class="timer-bar" id="timerBar"></div></div>
+          <span class="timer-val" id="timerVal">— ms</span>
+        </div>
+
+        <div class="signals" id="signalRows">
+          <div style="font-size:11px;color:var(--text3);font-family:var(--mono);text-align:center;padding:6px 0;">Signal breakdown appears after evaluation</div>
+        </div>
+
+        <div class="explain-box" id="explainBox" style="display:none;"></div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- AUDIT TRAIL -->
+  <div class="audit-panel" id="auditSection" style="display:none;">
+    <div class="panel">
+      <div class="panel-title">Compliance audit trail</div>
+      <div class="audit-list" id="auditList"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div>FraudGuard Interceptor — Confidential Prototype — Not for distribution</div>
+  <div class="footer-confidential">⚿ PROPRIETARY &amp; CONFIDENTIAL</div>
+</div>
+
+<script>
+  const TXS = [
+    { name:"Ahmed Al-Farsi", bank:"FNB", amount:12450, country:"ZA", type:"Wire", risk:18, decision:"APPROVE",
+      signals:{velocity:12,geo:8,pattern:5,device:15,amount:20},
+      explain:"Transaction consistent with historical spend profile. Merchant category, device fingerprint, and geolocation all match verified patterns. No anomalies detected across 14 rule checks." },
+    { name:"Recurring Debit", bank:"ABSA", amount:890, country:"ZA", type:"Debit order", risk:9, decision:"APPROVE",
+      signals:{velocity:5,geo:4,pattern:3,device:6,amount:10},
+      explain:"Mandate-verified debit order. Beneficiary bank code confirmed. Amount within pre-authorised limit. PASA regulation compliance confirmed." },
+    { name:"Unknown Merchant", bank:"Standard Bank", amount:55000, country:"NG", type:"Card", risk:87, decision:"DECLINE",
+      signals:{velocity:92,geo:85,pattern:78,device:70,amount:88},
+      explain:"High-velocity card use across 3 countries in 4 hours. Device ID not on record. Merchant category flagged under FATF guidance. Transaction blocked pending customer verification." },
+    { name:"Maria Silva", bank:"Nedbank", amount:3200, country:"ZA", type:"EFT", risk:61, decision:"REVIEW",
+      signals:{velocity:45,geo:72,pattern:55,device:30,amount:48},
+      explain:"Geolocation deviation from usual transaction corridor. Amount elevated relative to 90-day average but within account limits. Escalated to manual review queue — response required within 2 hours." },
+    { name:"Corporate Payroll", bank:"Investec", amount:2100000, country:"ZA", type:"Batch", risk:14, decision:"APPROVE",
+      signals:{velocity:10,geo:6,pattern:8,device:12,amount:30},
+      explain:"Batch payroll file authenticated via dual-authorisation control. File hash verified. Beneficiary list cross-referenced against previous cycles. SARB reporting threshold flagged for auto-submission." },
+    { name:"Crypto Exchange", bank:"Capitec", amount:98000, country:"AE", type:"Wire", risk:79, decision:"REVIEW",
+      signals:{velocity:65,geo:88,pattern:82,device:40,amount:75},
+      explain:"Recipient entity flagged as virtual asset service provider. Cross-border wire to UAE jurisdiction requires enhanced due diligence under FICA. Compliance officer notified." },
+    { name:"James Mokoena", bank:"FNB", amount:4500, country:"ZA", type:"EFT", risk:22, decision:"APPROVE",
+      signals:{velocity:18,geo:10,pattern:12,device:20,amount:25},
+      explain:"EFT to known beneficiary. Transaction within normal behavioural range. Device and session verified. All 14 checks passed without exception." },
+    { name:"Offshore Entity", bank:"ABSA", amount:780000, country:"MU", type:"Wire", risk:93, decision:"DECLINE",
+      signals:{velocity:88,geo:95,pattern:91,device:82,amount:97},
+      explain:"Wire to Mauritius shell entity with no previous transaction history. Amount exceeds threshold requiring SARB approval. Multiple FATF red flags present. Transaction declined and reported to compliance." },
+  ];
+
+  let injected = [], active = -1;
+  let counts = { total:0, approve:0, decline:0, review:0 };
+
+  function rnd(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+  function ts(){ return new Date().toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit',second:'2-digit'}); }
+
+  function updateStats(){
+    document.getElementById('txCountTop').textContent = counts.total;
+    document.getElementById('fraudCountTop').textContent = counts.decline;
+    document.getElementById('statTotal').textContent = counts.total;
+    document.getElementById('statApprove').textContent = counts.approve;
+    document.getElementById('statDecline').textContent = counts.decline;
+    document.getElementById('statReview').textContent = counts.review;
+  }
+
+  function injectTx(){
+    const t = TXS[rnd(0,TXS.length-1)];
+    const tx = {...t, id: Date.now(), ts: ts(), evaluated: false};
+    injected.unshift(tx);
+    counts.total++;
+    updateStats();
+    renderList();
+    setTimeout(()=>{ evaluate(tx.id); }, 250);
+  }
+
+  function renderList(){
+    const el = document.getElementById('txList');
+    if(!injected.length){
+      el.innerHTML='<div class="idle-hint">Click "Inject payment" to simulate a transaction</div>';
+      return;
+    }
+    el.innerHTML = injected.map(tx=>{
+      const init = tx.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+      const isAct = tx.id===active;
+      const badge = tx.evaluated
+        ? '<span class="badge badge-done">DONE</span>'
+        : '<span class="badge badge-live">LIVE</span>';
+      return `<div class="tx-item${isAct?' active':''}" onclick="selectTx(${tx.id})">
+        <div class="tx-avatar">${init}</div>
+        <div class="tx-info">
+          <div class="tx-name">${tx.name}</div>
+          <div class="tx-meta">${tx.type} · ${tx.bank} · ${tx.country}</div>
+        </div>
+        <div class="tx-right">
+          <div class="tx-amt">R ${tx.amount.toLocaleString()}</div>
+          ${badge}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function evaluate(id){
+    const tx = injected.find(t=>t.id===id);
+    if(!tx) return;
+    active = id;
+    renderList();
+    const ms = rnd(22,47);
+    let elapsed = 0;
+    const iv = setInterval(()=>{
+      elapsed += 2;
+      const pct = Math.min(100,(elapsed/ms)*100);
+      document.getElementById('timerBar').style.width = pct+'%';
+      document.getElementById('timerVal').textContent = elapsed+'ms';
+      if(elapsed >= ms){ clearInterval(iv); showResult(tx, ms); }
+    }, 2);
+  }
+
+  function showResult(tx, ms){
+    tx.evaluated = true;
+    counts[tx.decision.toLowerCase()]++;
+    updateStats();
+
+    const score = tx.risk;
+    const offset = Math.round(201 - (score/100)*201);
+    const arcEl = document.getElementById('scoreArc');
+    arcEl.setAttribute('stroke-dashoffset', offset);
+    arcEl.setAttribute('stroke', score<35?'#22c55e':score<65?'#f59e0b':'#ef4444');
+
+    document.getElementById('scoreVal').textContent = score;
+    document.getElementById('scoreVal').style.color = score<35?'#22c55e':score<65?'#f59e0b':'#ef4444';
+
+    const db = document.getElementById('decisionBar');
+    if(tx.decision==='APPROVE'){ db.className='decision-bar approve'; db.textContent='✓ Transaction Approved'; }
+    else if(tx.decision==='DECLINE'){ db.className='decision-bar decline'; db.textContent='✕ Transaction Declined'; }
+    else { db.className='decision-bar review'; db.textContent='⚑ Escalated for Review'; }
+
+    document.getElementById('timerVal').textContent = ms+'ms';
+
+    const labels={velocity:'Velocity',geo:'Geolocation',pattern:'Behaviour',device:'Device trust',amount:'Amount'};
+    document.getElementById('signalRows').innerHTML = Object.keys(tx.signals).map(k=>{
+      const v = tx.signals[k];
+      const col = v<35?'#22c55e':v<65?'#f59e0b':'#ef4444';
+      return `<div class="signal-row">
+        <span class="signal-label">${labels[k]}</span>
+        <div class="signal-bar-wrap"><div class="signal-bar" style="width:${v}%;background:${col};"></div></div>
+        <span class="signal-pct">${v}</span>
+      </div>`;
+    }).join('');
+
+    const eb = document.getElementById('explainBox');
+    eb.style.display='block';
+    eb.textContent = tx.explain;
+
+    addAudit(tx, ms);
+    renderList();
+  }
+
+  function selectTx(id){
+    const tx = injected.find(t=>t.id===id);
+    if(!tx || !tx.evaluated) return;
+    active = id;
+    renderList();
+    showResult(tx, rnd(22,47));
+  }
+
+  function addAudit(tx, ms){
+    document.getElementById('auditSection').style.display='block';
+    const list = document.getElementById('auditList');
+    const cls = tx.decision==='APPROVE'?'ab-approve':tx.decision==='DECLINE'?'ab-decline':'ab-review';
+    const row = document.createElement('div');
+    row.className='audit-row';
+    row.innerHTML=`
+      <span class="audit-time">${tx.ts}</span>
+      <span class="audit-msg">${tx.name} — R ${tx.amount.toLocaleString()} via ${tx.type} (${tx.bank}) — Risk ${tx.risk}/100 — ${ms}ms</span>
+      <span class="audit-badge ${cls}">${tx.decision}</span>`;
+    list.prepend(row);
+  }
+</script>
+</body>
+</html>
